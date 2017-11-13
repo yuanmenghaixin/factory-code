@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>代码生成工具</title>
+    <link rel="stylesheet" type="text/css" href="${rc.getContextPath()}/jquery-easyui/themes/default/easyui.css">
+    <link rel="stylesheet" type="text/css" href="${rc.getContextPath()}/jquery-easyui/themes/icon.css">
+    <script type="text/javascript" src="${rc.getContextPath()}/jquery-easyui/jquery.min.js"></script>
+    <script type="text/javascript" src="${rc.getContextPath()}/jquery-easyui/jquery.easyui.min.js"></script>
+</head>
+<body>
+<center>
+<div class="easyui-tabs" style="width: 90%;height: 600px;">
+    <div title="Bean配置" style="padding:10px">
+        <form id="bean" class="easyui-form" method="post" data-options="novalidate:true">
+            <table cellpadding="5">
+                <tr>
+                    <td>数据库:</td>
+                    <td>
+                        <select class="easyui-combobox" name="dbId" style="width: 171px;" id="dbId" onchange="dbChange(this)">
+                            <#if dbList??> <#list dbList as db>
+                                <option value="${db.id}">${db.linkName!''}-${db.dbType!''}</option>
+                            </#list>
+                            </#if>
+                        </select>
+                    </td>
+                    <td>实体名称:</td>
+                    <td>
+                        <input class="easyui-textbox" type="text" name="beanName" data-options="required:true" />
+                    </td>
+                    <td>对应功能名称:</td>
+                    <td>
+                        <input class="easyui-textbox" type="text" name="menuName" data-options="required:true" />
+                    </td>
+                    <td>数据库表名:</td>
+                    <td>
+                        <input class="easyui-textbox" type="text" name="tableName" data-options="required:true" />
+                    </td>
+                </tr>
+                <tr>
+                    <td>存储路径:</td>
+                    <td>
+                        <select class="easyui-combobox" name="configId" style="width: 171px;">
+                            <#if configList??> <#list configList as config>
+                                <option value="${config.id}">${config.configName!''}</option>
+                            </#list>
+                            </#if>
+                        </select>
+                    </td>
+                    <td>生成文件:</td>
+                    <td colspan="3">
+                        <table>
+                            <tr>
+                                <td><input  type="checkbox" name="bean" value="1"/></td><td>Bean</td>
+                                <td><input  type="checkbox" name="xml" value="1"/></td><td>XmlMapper</td>
+                                <td><input  type="checkbox" name="dao" value="1"/></td><td>Dao</td>
+                                <td><input  type="checkbox" name="service" value="1"/></td><td>Service</td>
+                                <td><input  type="checkbox" name="controller" value="1"/></td><td>Controller</td>
+                                <td><input  type="checkbox" name="html" value="1"/></td><td>HTML</td>
+                            </tr>
+
+
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="8">
+                        <a href="javascript:void(0)" class="easyui-linkbutton" data-options="iconCls:'icon-add'" onclick="createFile()">一键生成</a>
+                        <a href="javascript:void(0)" class="easyui-linkbutton" data-options="iconCls:'icon-add'" onclick="createTableSql()">建表SQL</a>
+                        <a href="javascript:void(0)" class="easyui-linkbutton" data-options="iconCls:'icon-add'" onclick="createMenuSql()">菜单SQL</a>
+                    </td>
+                </tr>
+            </table>
+        </form>
+        <table id="dg" class="easyui-datagrid" title="属性编辑" style="width:100%;height:77%;"
+               data-options="
+				iconCls: 'icon-edit',
+				rownumbers:true,
+				singleSelect: true,
+				toolbar: '#tb',
+				url: '',
+				method: 'get',
+				onClickRow: onClickRow
+			">
+            <thead>
+            <tr>
+                <th data-options="field:'fieldName',width:100,editor:'textbox'">字段名称</th>
+                <th data-options="field:'fieldCode',width:100,editor:'textbox'">字段编码</th>
+                <th data-options="field:'javaType',width:100,
+						formatter:function(value,row){
+							return row.javaType;
+						},
+						editor:{
+							type:'combobox',
+							options:{
+								valueField:'javaType',
+								textField:'javaType',
+								data:javaTypeArr,
+								required:true
+							}
+						}">JAVA类型</th>
+                <th data-options="field:'dbType',width:100,
+						formatter:function(value,row){
+							return row.dbType;
+						},
+						editor:{
+							type:'combobox',
+							options:{
+								valueField:'dbType',
+								textField:'dbType',
+								required:true,
+								url:'${rc.getContextPath()}/getDbType',
+								onBeforeLoad:function(param){
+                                    var db = $('#dbId').find('option:selected').text();
+                                    param.dbType = db.split('-')[1];
+								}
+							}
+						}">数据库类型</th>
+                <th data-options="field:'length',width:80,editor:'numberbox'">字段长度</th>
+                <th data-options="field:'precision',width:80,editor:'numberbox'">精度</th>
+                <th data-options="field:'keyFlag',width:80,editor:{type:'checkbox',options:{on:'1',off:'0'}}">主键</th>
+                <th data-options="field:'requiredFalg',width:80,editor:{type:'checkbox',options:{on:'1',off:'0'}}">是否必填</th>
+                <th data-options="field:'searchFlag',width:80,editor:{type:'checkbox',options:{on:'1',off:'0'}}">查询条件</th>
+                <th data-options="field:'listFlag',width:80,editor:{type:'checkbox',options:{on:'1',off:'0'}}">列表展示</th>
+            </tr>
+            </thead>
+        </table>
+
+        <div id="tb" style="height:auto">
+            <a href="javascript:void(0)" class="easyui-linkbutton" data-options="iconCls:'icon-add',plain:true" onclick="append()">新增</a>
+            <a href="javascript:void(0)" class="easyui-linkbutton" data-options="iconCls:'icon-remove',plain:true" onclick="removeit()">删除</a>
+        </div>
+    </div>
+    <div title="存储路径配置" style="padding:10px">
+        <form id="ff" class="easyui-form" method="post" data-options="novalidate:true">
+            <table cellpadding="5">
+                <tr>
+                    <td>请选择:</td>
+                    <td>
+                        <select class="easyui-combobox" name="configList" style="width: 171px;" id="configList" >
+                            <#if (configList?size>0)> <#list configList as config>
+                                <option value="${config.id}">${config.configName!''}</option>
+                            </#list>
+                            </#if>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>配置名称:</td>
+                    <td>
+                        <input class="easyui-textbox" type="text" name="configName" id="configName" data-options="required:true" />
+                    </td>
+                    <td>
+                        <span style="color:red;">*</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>项目路径:</td>
+                    <td>
+                        <input class="easyui-textbox" type="text" name="projectPath" id="projectPath" data-options="required:true" />
+                    </td>
+                    <td>
+                        <span style="color:red;">*项目存储在硬盘上的路径，例：E:/code/dmes-manage/ime.yz/src/main</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>包名:</td>
+                    <td>
+                        <input class="easyui-textbox" type="text" name="packageName" id="packageName" data-options="required:true" />
+                    </td>
+                    <td>
+                        <span style="color:red;">*基础包名，例：cn.evun.ime.yz,生成代码时会自动根据代码类型生成相应的bean/dao/service等包</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>页面路径:</td>
+                    <td>
+                        <input class="easyui-textbox" type="text" name="pagePath" id="pagePath" data-options="required:true" />
+                    </td>
+                    <td>
+                        <span style="color:red;">*此处指的是controller中访问页面时配置好的页面地址，例如：resources/templates</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>页面相对路径:</td>
+                    <td>
+                        <input class="easyui-textbox" type="text" name="relativePath" id="relativePath" data-options="required:true"/>
+                    </td>
+                    <td>
+                        <span style="color:red;">*此处是指页面相对于页面路径的相对路径，例如：yz/arrivalPlan</span>
+                    </td>
+                </tr>
+
+            </table>
+        </form>
+        <div style="padding:15px">
+            <a href="javascript:void(0)" class="easyui-linkbutton" data-options="iconCls:'icon-save'" onclick="configSave()" style="margin-left: 20px ;width:60px;">保存</a>
+            <a href="javascript:void(0)" class="easyui-linkbutton" data-options="iconCls:'icon-clear'" onclick="clearForm()" style="margin-left: 20px;width:60px;">清空</a>
+        </div>
+    </div>
+    <div title="数据库配置"  style="padding:10px">
+        <form id="db" class="easyui-form" method="post" data-options="novalidate:true">
+            <table cellpadding="5">
+                <tr>
+                    <td>请选择:</td>
+                    <td>
+                        <select class="easyui-combobox" name="dbList" style="width: 171px;" id="dbConfigList">
+                            <#if dbList??> <#list dbList as db>
+                                <option value="${db.id}">${db.linkName!''}-${db.dbType!''}</option>
+                            </#list>
+                            </#if>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>连接名称:</td>
+                    <td><input class="easyui-textbox" type="text" name="linkName" id="linkName"/></td>
+                </tr>
+                <tr>
+                    <td>数据库类型:</td>
+                    <td>
+                        <select class="easyui-combobox" name="dbType" style="width: 171px;" id="dbTypes" >
+                            <option value="0">MYSQL</option>
+                            <option value="1">ORACLE</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <td>IP地址:</td>
+                    <td><input class="easyui-textbox" type="text" name="ip" id="ip" data-options="required:true" value="localhost"/></td>
+                </tr>
+                <tr>
+                    <td>端口:</td>
+                    <td><input class="easyui-textbox" type="text" name="port" id="port" data-options="required:true,validType:'port'" /></td>
+                </tr>
+                <tr>
+                    <td>数据库名:</td>
+                    <td><input class="easyui-textbox" type="text" name="dbName" id="dbName" data-options="required:true"></input></td>
+                </tr>
+                <tr>
+                    <td>用户名:</td>
+                    <td><input class="easyui-textbox" name="userName" id="userName" data-options="required:true" /></td>
+                </tr>
+                <tr>
+                    <td>密码:</td>
+                    <td><input class="easyui-textbox" name="password" id="password" data-options="required:true" /></td>
+                </tr>
+            </table>
+        </form>
+        <div style="padding:15px">
+            <a href="javascript:void(0)" class="easyui-linkbutton" data-options="iconCls:'icon-search'" onclick="testDb()" style="width:80px;">测试连接</a>
+            <a href="javascript:void(0)" class="easyui-linkbutton" data-options="iconCls:'icon-save'" onclick="saveDbConfig()" style="margin-left: 20px ;width:60px;">保存</a>
+            <a href="javascript:void(0)" class="easyui-linkbutton" data-options="iconCls:'icon-clear'" onclick="clearForm()" style="margin-left: 20px;width:60px;">清空</a>
+        </div>
+    </div>
+</div>
+</center>
+<div id="w" class="easyui-window" title="Modal Window" data-options="modal:true,closed:true,iconCls:'icon-save'" style="width:900px;height:500px;padding:10px;">
+   <pre id="dlg">   <pre/>
+</div>
+</body>
+<script type="text/javascript">
+    var javaTypeArr = [{'javaType':"String"},{'javaType':"Integer"},{'javaType':"Long"},
+                       {'javaType':"Float"},{'javaType':"Double"},{'javaType':"Date"}];
+
+    var editIndex = undefined;
+    function endEditing(){
+        return true;
+
+    }
+    function onClickRow(index){
+        if (editIndex != index){
+            if (endEditing()){
+                $('#dg').datagrid('selectRow', index)
+                    .datagrid('beginEdit', index);
+                editIndex = index;
+            } else {
+                $('#dg').datagrid('selectRow', editIndex);
+            }
+        }
+    }
+    function append(){
+        if (endEditing()){
+            $('#dg').datagrid('appendRow',{});
+            editIndex = $('#dg').datagrid('getRows').length-1;
+            $('#dg').datagrid('selectRow', editIndex)
+                .datagrid('beginEdit', editIndex);
+        }
+    }
+    function removeit(){
+        if (editIndex == undefined){return}
+        $('#dg').datagrid('cancelEdit', editIndex)
+            .datagrid('deleteRow', editIndex);
+        editIndex = undefined;
+    }
+
+    /**
+     * 保存数据库配置
+     */
+    function saveDbConfig(){
+        var param = {
+            dbType:$("#dbTypes").val(),
+            ip:$("input[name='ip']").val(),
+            port:$("input[name='port']").val(),
+            dbName:$("input[name='dbName']").val(),
+            userName:$("input[name='userName']").val(),
+            password:$("input[name='password']").val(),
+            linkName:$("input[name='linkName']").val()
+        }
+
+        $.ajax({
+            url:'${rc.getContextPath()}/dbSave',
+            type:'POST',
+            data:param,
+            success:function (data) {
+                if (0 == data) {
+                    $.messager.alert('提示信息', '保存成功', 'info');
+                }else{
+                    $.messager.alert('提示信息', '保存失败', 'error');
+                }
+            }
+        })
+    }
+
+    /**
+     * 测试数据库连接是否有效
+     */
+    function testDb(){
+        var param = {
+            dbType:$("#dbTypes").val(),
+            ip:$("input[name='ip']").val(),
+            port:$("input[name='port']").val(),
+            dbName:$("input[name='dbName']").val(),
+            userName:$("input[name='userName']").val(),
+            password:$("input[name='password']").val(),
+            linkName:$("input[name='linkName']").val()
+        }
+
+        $.ajax({
+                url:'${rc.getContextPath()}/dbTest',
+                data:param,
+                type:'POST',
+                success:function (data) {
+                    if (0 == data) {
+                        $.messager.alert('提示信息', '连接成功', 'info');
+                    }else{
+                        $.messager.alert('提示信息', '连接失败', 'error');
+                    }
+                }
+        })
+    }
+
+    /**
+     * 保存配置信息
+     */
+    function configSave(){
+        var param = {
+            configName:$("input[name='configName']").val(),
+            projectPath:$("input[name='projectPath']").val(),
+            packageName:$("input[name='packageName']").val(),
+            pagePath:$("input[name='pagePath']").val(),
+            relativePath:$("input[name='relativePath']").val()
+        }
+        $.ajax({
+            url:'${rc.getContextPath()}/configSave',
+            data:param,
+            type:'POST',
+            success:function (data) {
+                if (0 == data) {
+                    $.messager.alert('提示信息', '保存成功', 'info');
+                }else{
+                    $.messager.alert('提示信息', '连接失败', 'error');
+                }
+            }
+        })
+    }
+
+    /**
+     * 一键生成所有文件
+     */
+    function createFile(){
+        var length = $("#dg").datagrid('getRows').length;
+        var params = new Array();
+        for(var i=0;i<length;i++){
+            var data = $("#dg").datagrid('getEditors',i);
+            var param = {
+                fieldName :data[0].target.val(),
+                fieldCode :data[1].target.val(),
+                javaType :data[2].target.val(),
+                dbType :data[3].target.val(),
+                length :data[4].target.val(),
+                precision :data[5].target.val(),
+                keyFlag :data[6].target.is(':checked')?1:0,
+                requiredFlag :data[7].target.is(':checked')?1:0,
+                searchFlag :data[8].target.is(':checked')?1:0,
+                listFlag:data[9].target.is(':checked')?1:0
+            }
+            params.push(param);
+        }
+        //获取form下的所有参数
+        var json = JSON.stringify(params);
+        var formParam = $("#bean").serialize();
+
+        $.ajax({
+            url:'${rc.getContextPath()}/fileCreate?'+formParam,
+            data:{jsonStr:json},
+            type:'POST',
+            success:function (data) {
+                if (0 == data) {
+                    $.messager.alert('提示信息', '生成成功', 'info');
+                }else{
+                    $.messager.alert('提示信息', '生成失败', 'error');
+                }
+            }
+        })
+    }
+
+    //生产tablesql
+    function createTableSql(){
+        var length = $("#dg").datagrid('getRows').length;
+        var params = new Array();
+        for(var i=0;i<length;i++){
+            var data = $("#dg").datagrid('getEditors',i);
+            var param = {
+                fieldName :data[0].target.val(),
+                fieldCode :data[1].target.val(),
+                javaType :data[2].target.val(),
+                dbType :data[3].target.val(),
+                length :data[4].target.val(),
+                precision :data[5].target.val(),
+                keyFlag :data[6].target.is(':checked')?1:0,
+                requiredFlag :data[7].target.is(':checked')?1:0,
+                searchFlag :data[8].target.is(':checked')?1:0,
+                listFlag:data[9].target.is(':checked')?1:0
+            }
+            params.push(param);
+        }
+        //获取form下的所有参数
+        var json = JSON.stringify(params);
+        var formParam = $("#bean").serialize();
+
+        $.ajax({
+            url:'${rc.getContextPath()}/tableSql?'+formParam,
+            data:{jsonStr:json},
+            type:'POST',
+            success:function (data) {
+//                if (0 == data) {
+//                    $.messager.alert('提示信息', '生成成功', 'info');
+//                }else{
+//                    $.messager.alert('提示信息', '生成失败', 'error');
+//                }
+                $('#dlg').text(data);
+                $('#w').window('open');
+
+            }
+        })
+    }
+
+    //生产menusql
+    function createMenuSql(){
+        var length = $("#dg").datagrid('getRows').length;
+        var params = new Array();
+        for(var i=0;i<length;i++){
+            var data = $("#dg").datagrid('getEditors',i);
+            var param = {
+                fieldName :data[0].target.val(),
+                fieldCode :data[1].target.val(),
+                javaType :data[2].target.val(),
+                dbType :data[3].target.val(),
+                length :data[4].target.val(),
+                precision :data[5].target.val(),
+                keyFlag :data[6].target.is(':checked')?1:0,
+                requiredFlag :data[7].target.is(':checked')?1:0,
+                searchFlag :data[8].target.is(':checked')?1:0,
+                listFlag:data[9].target.is(':checked')?1:0
+            }
+            params.push(param);
+        }
+        //获取form下的所有参数
+        var json = JSON.stringify(params);
+        var formParam = $("#bean").serialize();
+
+        $.ajax({
+            url:'${rc.getContextPath()}/menuSql?'+formParam,
+            data:{jsonStr:json},
+            type:'POST',
+            success:function (data) {
+//                if (0 == data) {
+//                    $.messager.alert('提示信息', '生成成功', 'info');
+//                }else{
+//                    $.messager.alert('提示信息', '生成失败', 'error');
+//                }
+                $('#dlg').text(data);
+                $('#w').window('open');
+            }
+        })
+    }
+
+
+
+    /**
+     * 获取当前数据库连接信息
+     * @param o
+     */
+    function dbListChange(id){
+        $.ajax({
+            url:'${rc.getContextPath()}/getDbConfigBean',
+            data:{id:id},
+            type:'GET',
+            success:function (data) {
+                var json = eval('('+data+')');
+                $("#dbTypes").combobox("setValue",json.dbType);
+                $("#ip").textbox("setValue",json.ip);
+                $("#port").textbox("setValue",json.port);
+                $("#dbName").textbox("setValue",json.dbName);
+                $("#userName").textbox("setValue",json.userName);
+                $("#password").textbox("setValue",json.password);
+                $("#linkName").textbox("setValue",json.linkName);
+
+            }
+        })
+    }
+
+    /**
+     * 获取当前配置
+     * @param o
+     */
+    function configListChange(id){
+        $.ajax({
+            url:'${rc.getContextPath()}/getConfigBean',
+            data:{id:id},
+            type:'GET',
+            success:function (data) {
+                var json = eval('('+data+')');
+                $("#configName").textbox("setValue",json.configName);
+                $("#projectPath").textbox("setValue",json.projectPath);
+                $("#packageName").textbox("setValue",json.packageName);
+                $("#pagePath").textbox("setValue",json.pagePath);
+                $("#relativePath").textbox("setValue",json.relativePath);
+            }
+        })
+    }
+
+    $(function(){
+        $('#configList').combobox({
+            onChange: function (newValue, oldValue) {
+                configListChange(newValue);
+            }
+        });
+        $('#dbConfigList').combobox({
+            onChange: function (newValue, oldValue) {
+                dbListChange(newValue);
+            }
+        });
+
+    })
+
+</script>
+</html>

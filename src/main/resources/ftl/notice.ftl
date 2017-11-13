@@ -1,0 +1,3 @@
+
+INSERT INTO sy_messageconfig (SITECODE, MESSAGECODE, INSTANTMESSAGEFLAG, EMAILMESSAGEFLAG, SHORTMESSAGEFLAG, MESSAGEGROUPCODE, CREATEUSER, CREATEDATETIME, MODIFYUSER, MODIFYDATETIME, MESSAGECONTENT)
+VALUES ('${siteCode}', 'PROCEDURENOTICE', '1', '0', '0', NULL, 'ADMIN', '2017-01-11 19:12:40', 'ADMIN', '2017-01-11 19:12:40', '<#noparse><b>下一工序提醒：</b><br/>生产订单编号：【${0}】<br/>生产作业号：【${1}】<br/>物料名称：【${2}】<br/>作业单元：【${3}】<br/>工序名称：【${4}】<br/>操作人：【${5}】<br/>完工数量【${6}】<br/>完成时间【${7}】，请下一道工序【${8}】准备生产。</#noparse>');
